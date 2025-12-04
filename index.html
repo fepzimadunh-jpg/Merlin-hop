@@ -1,161 +1,145 @@
--- MERLIN HOP — KEY SYSTEM (GITHUB)
--- CONFIGURE AQUI
-local GITHUB_KEYS_RAW = "https://raw.githubusercontent.com/fepzimadunh-jpg/Merlin-hop/main/vip_keys.json"
-local KEY_SITE_URL = "https://fepzimadunh-jpg.github.io/Merlin-hop/"
-local MAIN_SCRIPT_RAW = "https://pastebin.com/raw/qdgY6dTE"
-local LOCAL_KEYFILE = "merlin_key.json"
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Merlin Key Generator</title>
+<style>
+  body{background:#0b0711;color:#fff;font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+  .card{width:360px;background:#14121a;border-radius:12px;padding:20px;box-shadow:0 6px 24px rgba(0,0,0,.6);}
+  h1{margin:0 0 8px;font-size:18px;color:#caa8ff}
+  p{margin:6px 0;color:#bfb8d8;font-size:13px}
+  input,textarea{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #2a2740;background:#08060b;color:#fff;margin-top:8px}
+  .row{display:flex;gap:8px;margin-top:10px}
+  button{flex:1;padding:10px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+  .btn-primary{background:#6f4ef0;color:white}
+  .btn-ghost{background:#262235;color:#ddd}
+  .small{font-size:12px;color:#9b91b8;margin-top:8px}
+  pre{background:#0b0711;padding:10px;border-radius:8px;color:#dcd7ff;overflow:auto;max-height:200px}
+  .note{font-size:12px;color:#a899d6;margin-top:8px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔐 MERLIN KEY GENERATOR</h1>
+    <p>Cole o HWID (copiado automaticamente pelo script do executor) ou deixe em branco para gerar manualmente.</p>
+    <input id="hwid" placeholder="Cole o HWID aqui (ex: abcdef-12345-...)" />
+    <div class="row">
+      <button id="gen" class="btn-primary">Gerar Key</button>
+      <button id="newhw" class="btn-ghost">Gerar aleatório</button>
+    </div>
 
------------------------------------------------------------------
--- SERVICES
------------------------------------------------------------------
-local HttpService = game:GetService("HttpService")
-local Analytics = game:GetService("RbxAnalyticsService")
-local Players = game:GetService("Players")
-local LP = Players.LocalPlayer
+    <p class="small">Key gerada:</p>
+    <input id="keyOut" readonly />
 
------------------------------------------------------------------
--- HWID FUNCTION
------------------------------------------------------------------
-local function GetHWID()
-    local ok, id = pcall(function() return Analytics:GetClientId() end)
-    if ok and id then return tostring(id) end
-    return tostring(LP.UserId)
-end
+    <p class="small">JSON pronto (cole no <code>vip_keys.json</code>):</p>
+    <pre id="jsonOut">Nenhuma key gerada ainda.</pre>
 
------------------------------------------------------------------
--- SAVE / LOAD LOCAL KEY
------------------------------------------------------------------
-local function SaveLocalKey(data)
-    if writefile then
-        writefile(LOCAL_KEYFILE, HttpService:JSONEncode(data))
-    end
-end
+    <div class="row">
+      <button id="copyKey" class="btn-primary">Copiar Key</button>
+      <button id="copyJson" class="btn-ghost">Copiar JSON</button>
+    </div>
 
-local function LoadLocalKey()
-    if isfile and isfile(LOCAL_KEYFILE) then
-        local ok, d = pcall(function() return HttpService:JSONDecode(readfile(LOCAL_KEYFILE)) end)
-        if ok then return d end
-    end
-    return nil
-end
+    <div class="row" style="margin-top:8px">
+      <button id="downloadJson" class="btn-ghost">Baixar JSON</button>
+      <button id="openRaw" class="btn-ghost">Abrir vip_keys.json (raw)</button>
+    </div>
 
-local function LocalKeyValid()
-    local k = LoadLocalKey()
-    if not k then return false end
-    if k.hwid ~= GetHWID() then return false end
-    if os.time() > k.expiration then return false end
-    return true
-end
+    <p class="note">Obs: após gerar, copie o JSON e cole no arquivo <code>vip_keys.json</code> do seu repositório (ou edite direto no GitHub).</p>
+  </div>
 
------------------------------------------------------------------
--- FETCH KEYS FROM GITHUB
------------------------------------------------------------------
-local function FetchKeys()
-    local ok, res = pcall(function() return game:HttpGet(GITHUB_KEYS_RAW) end)
-    if not ok then return nil end
-    local ok2, json = pcall(function() return HttpService:JSONDecode(res) end)
-    if not ok2 then return nil end
-    return json
-end
+<script>
+(() => {
+  const hwidInput = document.getElementById('hwid');
+  const keyOut = document.getElementById('keyOut');
+  const jsonOut = document.getElementById('jsonOut');
+  const genBtn = document.getElementById('gen');
+  const newHw = document.getElementById('newhw');
+  const copyKey = document.getElementById('copyKey');
+  const copyJson = document.getElementById('copyJson');
+  const downloadJson = document.getElementById('downloadJson');
+  const openRaw = document.getElementById('openRaw');
 
------------------------------------------------------------------
--- VERIFY KEY INPUT
------------------------------------------------------------------
-local function VerifyKey(userKey)
-    local hwid = GetHWID()
-    local keys = FetchKeys()
-    if not keys then return false, "Erro ao buscar keys" end
-    
-    for _, entry in ipairs(keys) do
-        if entry.key == userKey and entry.hwid == hwid then
-            if os.time() > entry.expiration then
-                return false, "Key expirada"
-            end
-            
-            SaveLocalKey(entry)
-            return true, "Key válida!"
-        end
-    end
-    return false, "Key inválida"
-end
+  const RAW_JSON_URL = 'https://raw.githubusercontent.com/fepzimadunh-jpg/Merlin-hop/main/vip_keys.json'; // só referência
 
------------------------------------------------------------------
--- GUI KEY SYSTEM
------------------------------------------------------------------
-local function BuildUI()
-    if game.CoreGui:FindFirstChild("MERLIN_KEY") then
-        game.CoreGui["MERLIN_KEY"]:Destroy()
-    end
-    
-    local gui = Instance.new("ScreenGui", game.CoreGui)
-    gui.Name = "MERLIN_KEY"
+  // prefill hwid from URL param ?hwid=...
+  const params = new URLSearchParams(location.search);
+  if (params.get('hwid')) hwidInput.value = params.get('hwid');
 
-    local frame = Instance.new("Frame", gui)
-    frame.Size = UDim2.new(0,350,0,160)
-    frame.Position = UDim2.new(0.5,-175,0.4,-80)
-    frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+  function randDigits(n){
+    let s = '';
+    while(s.length < n) s += Math.floor(Math.random()*1e9).toString();
+    return s.substr(0,n);
+  }
 
-    local title = Instance.new("TextLabel", frame)
-    title.Size = UDim2.new(1,0,0,30)
-    title.BackgroundTransparency = 1
-    title.Text = "🔐 MERLIN KEY SYSTEM"
-    title.Font = Enum.Font.GothamBold
-    title.TextColor3 = Color3.fromRGB(200,150,255)
-    title.TextSize = 18
+  function genKey(hwid){
+    const digits = randDigits(20);
+    return 'VIP-FREE-' + digits;
+  }
 
-    local box = Instance.new("TextBox", frame)
-    box.Size = UDim2.new(0.7,0,0,30)
-    box.Position = UDim2.new(0.05,0,0.45,0)
-    box.PlaceholderText = "Cole sua key aqui"
-    box.Text = ""
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 14
+  function genExpirationTs(hours=24){
+    return Math.floor(Date.now()/1000) + (hours*3600);
+  }
 
-    local getBtn = Instance.new("TextButton", frame)
-    getBtn.Size = UDim2.new(0.3,0,0,30)
-    getBtn.Position = UDim2.new(0.05,0,0.75,0)
-    getBtn.Text = "GET KEY"
-    getBtn.TextColor3 = Color3.new(1,1,1)
-    getBtn.BackgroundColor3 = Color3.fromRGB(120,60,255)
+  function buildEntry(key, hwid, expiration){
+    return {
+      key: key,
+      hwid: hwid,
+      expiration: expiration
+    };
+  }
 
-    local verifyBtn = Instance.new("TextButton", frame)
-    verifyBtn.Size = UDim2.new(0.3,0,0,30)
-    verifyBtn.Position = UDim2.new(0.65,0,0.75,0)
-    verifyBtn.Text = "Verify Key"
-    verifyBtn.BackgroundColor3 = Color3.fromRGB(60,180,120)
+  function updateOutputs(entry){
+    keyOut.value = entry.key;
+    jsonOut.textContent = JSON.stringify(entry, null, 2);
+  }
 
-    local status = Instance.new("TextLabel", frame)
-    status.Size = UDim2.new(1,0,0,30)
-    status.Position = UDim2.new(0,0,0.15,0)
-    status.BackgroundTransparency = 1
-    status.Font = Enum.Font.Gotham
-    status.TextColor3 = Color3.fromRGB(255,180,60)
-    status.TextSize = 13
+  genBtn.addEventListener('click', ()=>{
+    let hwid = hwidInput.value.trim();
+    if (!hwid){
+      alert('Cole o HWID (vindo do script) ou gere um aleatório.');
+      return;
+    }
+    const key = genKey(hwid);
+    const exp = genExpirationTs(24);
+    const entry = buildEntry(key, hwid, exp);
+    updateOutputs(entry);
+  });
 
-    getBtn.MouseButton1Click:Connect(function()
-        setclipboard(GetHWID())
-        game:OpenBrowserWindow(KEY_SITE_URL)
-        status.Text = "HWID copiado — cole no site."
-    end)
+  newHw.addEventListener('click', ()=>{
+    // gera HWID aleatório para testes
+    const test = 'TESTHWID-' + randDigits(12);
+    hwidInput.value = test;
+  });
 
-    verifyBtn.MouseButton1Click:Connect(function()
-        local ok, msg = VerifyKey(box.Text)
-        if ok then
-            status.Text = msg
-            wait(1)
-            gui:Destroy()
-            loadstring(game:HttpGet(MAIN_SCRIPT_RAW))()
-        else
-            status.Text = msg
-        end
-    end)
-end
+  copyKey.addEventListener('click', ()=>{
+    if (!keyOut.value) return alert('Nenhuma key gerada.');
+    navigator.clipboard.writeText(keyOut.value).then(()=> alert('Key copiada!'));
+  });
 
------------------------------------------------------------------
--- START
------------------------------------------------------------------
-if LocalKeyValid() then
-    loadstring(game:HttpGet(MAIN_SCRIPT_RAW))()
-else
-    BuildUI()
-end
+  copyJson.addEventListener('click', ()=>{
+    if (!jsonOut.textContent || jsonOut.textContent.includes('Nenhuma')) return alert('Nenhuma key gerada.');
+    navigator.clipboard.writeText(jsonOut.textContent).then(()=> alert('JSON copiado!'));
+  });
+
+  downloadJson.addEventListener('click', ()=>{
+    if (!jsonOut.textContent || jsonOut.textContent.includes('Nenhuma')) return alert('Nenhuma key gerada.');
+    const blob = new Blob([jsonOut.textContent], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'vip_key_generated.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  openRaw.addEventListener('click', ()=>{
+    window.open(RAW_JSON_URL, '_blank');
+  });
+
+})();
+</script>
+</body>
+                                                                        </html>
