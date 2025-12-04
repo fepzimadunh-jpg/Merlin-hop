@@ -1,6 +1,161 @@
-<html>
-<body>
-<h1>Gerador de Key Merlin Hop</h1>
-<p>A sua key ainda será gerada aqui.</p>
-</body>
-</html>
+-- MERLIN HOP — KEY SYSTEM (GITHUB)
+-- CONFIGURE AQUI
+local GITHUB_KEYS_RAW = "https://raw.githubusercontent.com/fepzimadunh-jpg/Merlin-hop/main/vip_keys.json"
+local KEY_SITE_URL = "https://fepzimadunh-jpg.github.io/Merlin-hop/"
+local MAIN_SCRIPT_RAW = "https://pastebin.com/raw/qdgY6dTE"
+local LOCAL_KEYFILE = "merlin_key.json"
+
+-----------------------------------------------------------------
+-- SERVICES
+-----------------------------------------------------------------
+local HttpService = game:GetService("HttpService")
+local Analytics = game:GetService("RbxAnalyticsService")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+-----------------------------------------------------------------
+-- HWID FUNCTION
+-----------------------------------------------------------------
+local function GetHWID()
+    local ok, id = pcall(function() return Analytics:GetClientId() end)
+    if ok and id then return tostring(id) end
+    return tostring(LP.UserId)
+end
+
+-----------------------------------------------------------------
+-- SAVE / LOAD LOCAL KEY
+-----------------------------------------------------------------
+local function SaveLocalKey(data)
+    if writefile then
+        writefile(LOCAL_KEYFILE, HttpService:JSONEncode(data))
+    end
+end
+
+local function LoadLocalKey()
+    if isfile and isfile(LOCAL_KEYFILE) then
+        local ok, d = pcall(function() return HttpService:JSONDecode(readfile(LOCAL_KEYFILE)) end)
+        if ok then return d end
+    end
+    return nil
+end
+
+local function LocalKeyValid()
+    local k = LoadLocalKey()
+    if not k then return false end
+    if k.hwid ~= GetHWID() then return false end
+    if os.time() > k.expiration then return false end
+    return true
+end
+
+-----------------------------------------------------------------
+-- FETCH KEYS FROM GITHUB
+-----------------------------------------------------------------
+local function FetchKeys()
+    local ok, res = pcall(function() return game:HttpGet(GITHUB_KEYS_RAW) end)
+    if not ok then return nil end
+    local ok2, json = pcall(function() return HttpService:JSONDecode(res) end)
+    if not ok2 then return nil end
+    return json
+end
+
+-----------------------------------------------------------------
+-- VERIFY KEY INPUT
+-----------------------------------------------------------------
+local function VerifyKey(userKey)
+    local hwid = GetHWID()
+    local keys = FetchKeys()
+    if not keys then return false, "Erro ao buscar keys" end
+    
+    for _, entry in ipairs(keys) do
+        if entry.key == userKey and entry.hwid == hwid then
+            if os.time() > entry.expiration then
+                return false, "Key expirada"
+            end
+            
+            SaveLocalKey(entry)
+            return true, "Key válida!"
+        end
+    end
+    return false, "Key inválida"
+end
+
+-----------------------------------------------------------------
+-- GUI KEY SYSTEM
+-----------------------------------------------------------------
+local function BuildUI()
+    if game.CoreGui:FindFirstChild("MERLIN_KEY") then
+        game.CoreGui["MERLIN_KEY"]:Destroy()
+    end
+    
+    local gui = Instance.new("ScreenGui", game.CoreGui)
+    gui.Name = "MERLIN_KEY"
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0,350,0,160)
+    frame.Position = UDim2.new(0.5,-175,0.4,-80)
+    frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1,0,0,30)
+    title.BackgroundTransparency = 1
+    title.Text = "🔐 MERLIN KEY SYSTEM"
+    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = Color3.fromRGB(200,150,255)
+    title.TextSize = 18
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0.7,0,0,30)
+    box.Position = UDim2.new(0.05,0,0.45,0)
+    box.PlaceholderText = "Cole sua key aqui"
+    box.Text = ""
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
+
+    local getBtn = Instance.new("TextButton", frame)
+    getBtn.Size = UDim2.new(0.3,0,0,30)
+    getBtn.Position = UDim2.new(0.05,0,0.75,0)
+    getBtn.Text = "GET KEY"
+    getBtn.TextColor3 = Color3.new(1,1,1)
+    getBtn.BackgroundColor3 = Color3.fromRGB(120,60,255)
+
+    local verifyBtn = Instance.new("TextButton", frame)
+    verifyBtn.Size = UDim2.new(0.3,0,0,30)
+    verifyBtn.Position = UDim2.new(0.65,0,0.75,0)
+    verifyBtn.Text = "Verify Key"
+    verifyBtn.BackgroundColor3 = Color3.fromRGB(60,180,120)
+
+    local status = Instance.new("TextLabel", frame)
+    status.Size = UDim2.new(1,0,0,30)
+    status.Position = UDim2.new(0,0,0.15,0)
+    status.BackgroundTransparency = 1
+    status.Font = Enum.Font.Gotham
+    status.TextColor3 = Color3.fromRGB(255,180,60)
+    status.TextSize = 13
+
+    getBtn.MouseButton1Click:Connect(function()
+        setclipboard(GetHWID())
+        game:OpenBrowserWindow(KEY_SITE_URL)
+        status.Text = "HWID copiado — cole no site."
+    end)
+
+    verifyBtn.MouseButton1Click:Connect(function()
+        local ok, msg = VerifyKey(box.Text)
+        if ok then
+            status.Text = msg
+            wait(1)
+            gui:Destroy()
+            loadstring(game:HttpGet(MAIN_SCRIPT_RAW))()
+        else
+            status.Text = msg
+        end
+    end)
+end
+
+-----------------------------------------------------------------
+-- START
+-----------------------------------------------------------------
+if LocalKeyValid() then
+    loadstring(game:HttpGet(MAIN_SCRIPT_RAW))()
+else
+    BuildUI()
+end
