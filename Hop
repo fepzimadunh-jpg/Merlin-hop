@@ -1,0 +1,213 @@
+-- 🟣 MERLIN HOP - ANTI KICK + AUTO HOP D7 + CLOSE BUTTONS + DRAG UI
+-- Desenvolvido por Fpzin
+
+if game.CoreGui:FindFirstChild("MERLIN_KEY_GUI") then game.CoreGui.MERLIN_KEY_GUI:Destroy() end
+if game.CoreGui:FindFirstChild("MERLIN_HOP_PANEL") then game.CoreGui.MERLIN_HOP_PANEL:Destroy() end
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+
+-------------------------------------
+-- 🔐 KEYS DE 24 HORAS
+-------------------------------------
+local VALID_KEYS = {
+"MERLIN-24H-Q73XWP-EXP-24H",
+"MERLIN-24H-MK9LQZ-EXP-24H",
+"MERLIN-24H-R48TDE-EXP-24H",
+"MERLIN-24H-HU2PQM-EXP-24H",
+"MERLIN-24H-ZE85NR-EXP-24H",
+"MERLIN-24H-BT4XJW-EXP-24H",
+"MERLIN-24H-PQ1MZC-EXP-24H",
+"MERLIN-24H-XD7FTR-EXP-24H",
+"MERLIN-24H-VL6QPA-EXP-24H",
+"MERLIN-24H-CW93HB-EXP-24H",
+}
+
+local function SaveExpire() writefile("merlin_expire.txt", tostring(os.time()+86400)) end
+local function ExpValid() if not isfile("merlin_expire.txt") then return false end return tonumber(readfile("merlin_expire.txt")) > os.time() end
+local function CheckKey(k) for _,v in pairs(VALID_KEYS) do if v==k then return true end end return false end
+
+-----------------------------------------------------------
+-- 🔥 ANTI-KICK
+-----------------------------------------------------------
+local mt = getrawmetatable(game)
+setreadonly(mt,false)
+local old = mt.__namecall
+mt.__namecall = function(self,...)
+    if getnamecallmethod():lower():find("kick") then return nil end
+    return old(self,...)
+end
+
+-----------------------------------------------------------
+-- Função DRAG
+-----------------------------------------------------------
+local function Dragify(Frame)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    Frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+
+    Frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then update(input) end
+    end)
+end
+
+-----------------------------------------------------------
+-- 🟣 PAINEL DE HOP
+-----------------------------------------------------------
+local AutoHopEnabled = false
+local MAXPLAYERS_TARGET = 7
+
+local function OpenHopPanel()
+    local hop = Instance.new("ScreenGui", game.CoreGui)
+    hop.Name = "MERLIN_HOP_PANEL"
+
+    local box = Instance.new("Frame", hop)
+    box.Size = UDim2.new(0,220,0,150)
+    box.Position = UDim2.new(0.4,0,0.35,0)
+    box.BackgroundColor3 = Color3.fromRGB(25,0,35)
+
+    Dragify(box) -- ARRÁSTAVEL
+
+    -- BOTÃO FECHAR
+    local x = Instance.new("TextButton", box)
+    x.Size = UDim2.new(0,25,0,25)
+    x.Position = UDim2.new(0.87,0,0,0)
+    x.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    x.Text = "X"
+    x.TextColor3 = Color3.new(1,1,1)
+    x.Font = Enum.Font.GothamBold
+    x.TextSize = 14
+    x.MouseButton1Click:Connect(function()
+        hop:Destroy()
+    end)
+
+    -- Botão manual hop
+    local bt = Instance.new("TextButton", box)
+    bt.Size = UDim2.new(0.8,0,0,35)
+    bt.Position = UDim2.new(0.1,0,0.25,0)
+    bt.BackgroundColor3 = Color3.fromRGB(150,0,200)
+    bt.Text = "🔁 TROCAR HOP"
+    bt.Font = Enum.Font.GothamBold
+    bt.TextColor3 = Color3.fromRGB(255,255,255)
+
+    bt.MouseButton1Click:Connect(function()
+        local PlaceId = game.PlaceId
+        local servers = HttpService:JSONDecode(
+        game:HttpGet("https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
+        )
+        for _,v in pairs(servers.data) do if v.playing < MAXPLAYERS_TARGET then TeleportService:TeleportToPlaceInstance(PlaceId, v.id, LocalPlayer) break end end
+    end)
+
+    -- AUTO HOP
+    local auto = Instance.new("TextButton", box)
+    auto.Size = UDim2.new(0.8,0,0,35)
+    auto.Position = UDim2.new(0.1,0,0.6,0)
+    auto.BackgroundColor3 = Color3.fromRGB(0,200,100)
+    auto.Text = "⚙ AUTO HOP: DESATIVADO"
+    auto.Font = Enum.Font.GothamBold
+    auto.TextColor3 = Color3.fromRGB(0,0,0)
+
+    auto.MouseButton1Click:Connect(function()
+        AutoHopEnabled = not AutoHopEnabled
+        auto.Text = AutoHopEnabled and "⚙ AUTO HOP: ATIVADO" or "⚙ AUTO HOP: DESATIVADO"
+        auto.BackgroundColor3 = AutoHopEnabled and Color3.fromRGB(0,255,120) or Color3.fromRGB(100,0,0)
+    end)
+
+    -- Loop AUTO HOP
+    task.spawn(function()
+        while task.wait(2) do
+            if AutoHopEnabled then
+                local PlaceId = game.PlaceId
+                local servers = HttpService:JSONDecode(
+                game:HttpGet("https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
+                )
+                for _,v in pairs(servers.data) do if v.playing < MAXPLAYERS_TARGET then TeleportService:TeleportToPlaceInstance(PlaceId, v.id, LocalPlayer) break end end
+            end
+        end
+    end)
+end
+
+-----------------------------------------------------------
+-- GUI KEY
+-----------------------------------------------------------
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "MERLIN_KEY_GUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,300,0,200)
+frame.Position = UDim2.new(0.35,0,0.3,0)
+frame.BackgroundColor3 = Color3.fromRGB(40,0,60)
+
+Dragify(frame) -- ARRÁSTAVEL
+
+-- BOTÃO FECHAR GUI DE KEY
+local xK = Instance.new("TextButton", frame)
+xK.Size = UDim2.new(0,25,0,25)
+xK.Position = UDim2.new(0.87,0,0,0)
+xK.BackgroundColor3 = Color3.fromRGB(120,0,0)
+xK.Text = "X"
+xK.Font = Enum.Font.GothamBold
+xK.TextColor3 = Color3.new(1,1,1)
+xK.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,35)
+title.Text = "🔐 MERLIN - KEY 24H"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(210,140,255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local keyBox = Instance.new("TextBox", frame)
+keyBox.Size = UDim2.new(0.8,0,0,30)
+keyBox.Position = UDim2.new(0.1,0,0.35,0)
+keyBox.PlaceholderText = "Coloque sua key..."
+keyBox.BackgroundColor3 = Color3.fromRGB(90,0,140)
+keyBox.TextColor3 = Color3.fromRGB(255,255,255)
+
+local checkBtn = Instance.new("TextButton", frame)
+checkBtn.Size = UDim2.new(0.8,0,0,30)
+checkBtn.Position = UDim2.new(0.1,0,0.6,0)
+checkBtn.BackgroundColor3 = Color3.fromRGB(0,200,80)
+checkBtn.Text = "✔ VERIFICAR"
+
+checkBtn.MouseButton1Click:Connect(function()
+    local typed = keyBox.Text:gsub("%s","")
+
+    if ExpValid() then gui:Destroy() OpenHopPanel() return end
+
+    if CheckKey(typed) then
+        SaveExpire()
+        checkBtn.Text = "✔ ACEITA"
+        task.wait(0.6)
+        gui:Destroy()
+        OpenHopPanel()
+    else
+        checkBtn.Text = "✖ KEY ERRADA"
+        task.wait(1.5)
+        checkBtn.Text = "✔ VERIFICAR"
+    end
+end)
